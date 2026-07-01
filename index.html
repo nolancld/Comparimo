@@ -64,8 +64,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .legend{display:flex;gap:14px;font-size:11px;color:var(--label);}
 .legend span{display:inline-flex;align-items:center;gap:5px;}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-.year-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:14px;position:sticky;bottom:calc(68px + env(safe-area-inset-bottom));z-index:10;box-shadow:0 8px 24px rgba(0,0,0,0.35);}
-.decomp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:10px;}
+.year-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:10px;}
 .year-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .year-row .yl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;}
 .year-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;appearance:none;border-radius:2px;background:linear-gradient(to right,var(--blue) var(--p,40%),var(--border) var(--p,40%));}
@@ -214,7 +213,6 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
   <div class="section-title">&#128202; Hypoth&#232;ses</div>
   <div class="card">
     <div class="field"><label>Appr&#233;ciation fonci&#232;re/an</label><div class="input-wrap"><input type="number" id="appreci" step="0.1"><span class="unit">%</span></div></div>
-    <div class="field"><label>Revalorisation loyer/an</label><div class="input-wrap"><input type="number" id="revaloLoyer" step="0.1"><span class="unit">%</span></div></div>
     <div class="field"><label>% travaux valoris&#233;s</label><div class="input-wrap"><input type="number" id="travPV" step="5"><span class="unit">%</span></div></div>
     <div class="advanced-toggle" onclick="toggleAdvanced('hyp-adv',this)"><span class="arrow">&#9658;</span> Affiner</div>
     <div class="advanced-fields" id="hyp-adv">
@@ -283,8 +281,12 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
     </div>
     <div class="chart-canvas-wrap"><canvas id="chart"></canvas></div>
   </div>
-
-  <div class="decomp-card">
+  <div class="year-card">
+    <div class="year-row">
+      <span class="yl">Ann&#233;e</span>
+      <input type="range" id="yearSlider" min="0" max="25" step="1" value="10">
+      <span class="yv" id="yearVal">10</span>
+    </div>
     <div class="decomp">
       <div class="decomp-row"><div class="dr-top"><span class="dl" onclick="showInfo('prixVente')"><span class="info">i</span> Prix de vente estim&#233;</span><span class="dv" id="d-prixVente">--</span></div><div class="bar-bg"><div class="bar-fill" id="bar-prixVente" style="background:var(--blue)"></div></div></div>
       <div class="decomp-row"><div class="dr-top"><span class="dl" onclick="showInfo('dette')"><span class="info">i</span> Dette restante banque</span><span class="dv" id="d-dette" style="color:var(--red)">--</span></div><div class="bar-bg"><div class="bar-fill" id="bar-dette" style="background:var(--red)"></div></div></div>
@@ -298,22 +300,13 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
   <div class="section-title" id="year-detail-title">&#128197; Ann&#233;e <span id="year-detail-num">10</span> — focus</div>
   <div class="card" id="year-detail-card">
     <div class="result"><div class="rl">&#128178; Mensualit&#233; cr&#233;dit</div><div class="rv" id="yd-mensualite">--</div></div>
-    <div class="result"><div class="rl">&#127968; Capital rembours&#233; cette ann&#233;e</div><div class="rv" id="yd-capital" style="color:var(--green)">--</div></div>
+    <div class="result"><div class="rl">&#127968; Part capital rembours&#233;e</div><div class="rv" id="yd-capital" style="color:var(--green)">--</div></div>
     <div class="result"><div class="rl">&#128184; Int&#233;r&#234;ts pay&#233;s cette ann&#233;e</div><div class="rv" id="yd-interets" style="color:var(--red)">--</div></div>
-    <div class="result"><div class="rl">&#128203; Imp&#244;t cette ann&#233;e</div><div style="text-align:right"><div class="rv" id="yd-impot">--</div><div id="yd-deficit" style="font-size:11px;color:var(--amber);margin-top:2px;"></div></div></div>
-    <div class="result"><div class="rl">&#128181; Cash-flow net cette ann&#233;e</div><div class="rv" id="yd-cashflow">--</div></div>
-    <div class="result"><div class="rl">&#127973; Loyer encaiss&#233; cette ann&#233;e</div><div class="rv" id="yd-loyer">--</div></div>
+    <div class="result"><div class="rl">&#128181; Cash-flow mensuel net</div><div class="rv" id="yd-cashflow">--</div></div>
+    <div class="result"><div class="rl">&#127973; Loyer encaiss&#233; (ann&#233;e)</div><div class="rv" id="yd-loyer">--</div></div>
+    <div class="result"><div class="rl">&#128203; Imp&#244;t estim&#233; (ann&#233;e)</div><div class="rv" id="yd-impot" style="color:var(--red)">--</div></div>
     <div class="result"><div class="rl">&#127968; Dette restante</div><div class="rv" id="yd-dette" style="color:var(--muted)">--</div></div>
     <div class="result"><div class="rl">&#128200; Plus-value latente</div><div class="rv" id="yd-pv">--</div></div>
-  </div>
-
-  <!-- Slider sticky collé en bas, dans le flux de la page simulation uniquement -->
-  <div class="year-card">
-    <div class="year-row">
-      <span class="yl">Ann&#233;e</span>
-      <input type="range" id="yearSlider" min="0" max="25" step="1" value="10">
-      <span class="yv" id="yearVal">10</span>
-    </div>
   </div>
 </div>
 
@@ -456,8 +449,8 @@ const EXPL={
   netApresImpot:["Net après impôt (gain créé)","Prix vente − Dette + CFs − Impôts − Frais revente − Taxe PV − Apport","La vraie valeur créée : on soustrait l'apport car c'est ton capital de départ, pas un gain."],
 };
 
-const FIELDS=["prixAchat","apport","travaux","fraisAgence","agenceRevente","taux","duree","loyer","vacance","assurance","copro","taxe","entretien","regime","tmi","dureeAmortBien","dureeAmortTravaux","appreci","revaloLoyer","travPV","abattPV","sp500","prixVenteForce","anneeVenteForce"];
-const DEFAULTS={prixAchat:55000,apport:0,travaux:15000,fraisAgence:0,agenceRevente:4,taux:3.7,duree:25,loyer:450,vacance:4,assurance:100,copro:720,taxe:658,entretien:300,regime:"LMNP",tmi:30,dureeAmortBien:30,dureeAmortTravaux:10,appreci:0.5,revaloLoyer:0.5,travPV:25,abattPV:6,sp500:8,reinvestCF:false,prixVenteForce:0,anneeVenteForce:10};
+const FIELDS=["prixAchat","apport","travaux","fraisAgence","agenceRevente","taux","duree","loyer","vacance","assurance","copro","taxe","entretien","regime","tmi","dureeAmortBien","dureeAmortTravaux","appreci","travPV","abattPV","sp500","prixVenteForce","anneeVenteForce"];
+const DEFAULTS={prixAchat:55000,apport:0,travaux:15000,fraisAgence:0,agenceRevente:4,taux:3.7,duree:25,loyer:450,vacance:4,assurance:100,copro:720,taxe:658,entretien:300,regime:"LMNP",tmi:30,dureeAmortBien:30,dureeAmortTravaux:10,appreci:0.5,travPV:25,abattPV:6,sp500:8,reinvestCF:false,prixVenteForce:0,anneeVenteForce:10};
 
 function getInputs(){
   const p={};
@@ -477,7 +470,6 @@ const fr=n=>new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Math
 const eur=n=>(n<0?"−":"+")+fr(Math.abs(n))+" €";
 const frK=n=>{const a=Math.abs(n);return(n<0?"−":"")+( a>=1000?new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1}).format(a/1000)+" k€":fr(a)+" €");};
 
-
 function compute(p){
   const fraisNotaire=p.prixAchat*0.08;
   const emprunt=p.prixAchat+fraisNotaire+p.travaux+p.fraisAgence-p.apport;
@@ -485,125 +477,144 @@ function compute(p){
   const n=p.duree*12;
   const mensualite=(emprunt>0&&tauxM>0)?emprunt*tauxM*Math.pow(1+tauxM,n)/(Math.pow(1+tauxM,n)-1):emprunt/n;
   const loyerEffectif=p.loyer*(52-p.vacance)/52*12;
-  const revalo=p.revaloLoyer/100;
   const chargesTotal=p.assurance+p.copro+p.taxe+p.entretien;
-  const cashflowBrut=loyerEffectif/12-mensualite-chargesTotal/12;
+  const cashflow=loyerEffectif/12-mensualite-chargesTotal/12;
   const rendBrut=loyerEffectif/(p.prixAchat+fraisNotaire+p.travaux+p.fraisAgence)*100;
+
   const dureeAmortBien=p.dureeAmortBien||30;
   const dureeAmortTravaux=p.dureeAmortTravaux||10;
+  // Base amortissable : prix achat + notaire + agence (100% pour un appart, pas de terrain)
   const baseAmortBien=(p.prixAchat+fraisNotaire+p.fraisAgence)/dureeAmortBien;
-  const tauxImpotTotal=p.tmi/100+0.172;
+  const tauxImpotTotal=p.tmi/100+0.172; // TMI + prélèvements sociaux 17,2%
 
-  function capR(t){
-    if(t<=0)return emprunt; if(t>=p.duree)return 0;
-    if(tauxM===0)return emprunt*(1-t/p.duree);
-    var tm=t*12;
-    return emprunt*(Math.pow(1+tauxM,n)-Math.pow(1+tauxM,tm))/(Math.pow(1+tauxM,n)-1);
-  }
+  function capR(t){if(t<=0)return emprunt;if(t>=p.duree)return 0;if(tauxM===0)return emprunt*(1-t/p.duree);const tm=t*12;return emprunt*(Math.pow(1+tauxM,n)-Math.pow(1+tauxM,tm))/(Math.pow(1+tauxM,n)-1);}
 
-  function loyerAnneeT(t){
-    return loyerEffectif*Math.pow(1+revalo,Math.max(0,t-1));
-  }
+  // Calcul fiscal précis pour l'année t (avec intérêts réels de cette année)
+  function getFiscalYear(t,prevDette,currDette){
+    if(t<=0)return{impot:0,impotNu:0,res:0,resNu:0,interets:0};
+    const interets=mensualite*12-(prevDette-currDette);
+    const amortTrav=(t<=dureeAmortTravaux)?p.travaux/dureeAmortTravaux:0;
 
-  function getFiscalYear(t,prevDette,currDette,deficitReport){
-    if(t<=0)return{impot:0,impotNu:0,res:0,resNu:0,interets:0,newDeficit:deficitReport,loyerT:loyerEffectif};
-    var interets=mensualite*12-(prevDette-currDette);
-    var amortTrav=(t<=dureeAmortTravaux)?p.travaux/dureeAmortTravaux:0;
-    var loyerT=loyerAnneeT(t);
-    var resLMNP=loyerT-chargesTotal-interets-baseAmortBien-amortTrav;
-    var newDeficit=deficitReport;
-    var resApresReport=resLMNP;
-    if(resLMNP<0){
-      newDeficit=deficitReport+(-resLMNP); resApresReport=0;
-    }else if(newDeficit>0){
-      var imputed=Math.min(newDeficit,resLMNP);
-      resApresReport=resLMNP-imputed; newDeficit=deficitReport-imputed;
+    // LMNP réel : charges + intérêts + amortissements
+    const resLMNP=loyerEffectif-chargesTotal-interets-baseAmortBien-amortTrav;
+    const impotLMNP=Math.max(0,resLMNP)*tauxImpotTotal;
+
+    // Location nue réel : charges + intérêts, sans amortissements
+    const resNu=loyerEffectif-chargesTotal-interets;
+    let impotNu;
+    if(resNu>=0){
+      impotNu=resNu*tauxImpotTotal;
+    }else{
+      // Déficit foncier : jusqu'à 10 700€ déductible du revenu global → économie TMI
+      const deductible=Math.min(10700,-resNu);
+      impotNu=-deductible*(p.tmi/100); // économie d'impôt (négatif = gain)
     }
-    var impotLMNP=resApresReport*tauxImpotTotal;
-    var resNu=loyerT-chargesTotal-interets;
-    var impotNu;
-    if(resNu>=0){impotNu=resNu*tauxImpotTotal;}
-    else{var deductible=Math.min(10700,-resNu);impotNu=-deductible*(p.tmi/100);}
-    var impotMicroBIC=loyerT*0.5*tauxImpotTotal;
-    var impotMicroFoncier=loyerT*0.7*tauxImpotTotal;
-    var impot;
+
+    // Micro-BIC (LMNP meublé) : abattement 50%
+    const impotMicroBIC=loyerEffectif*0.5*tauxImpotTotal;
+    // Micro-foncier (nu) : abattement 30%
+    const impotMicroFoncier=loyerEffectif*0.7*tauxImpotTotal;
+
+    let impot;
     if(p.regime==="LMNP")impot=impotLMNP;
     else if(p.regime==="NU")impot=impotNu;
     else if(p.regime==="MICRO_BIC")impot=impotMicroBIC;
     else impot=impotMicroFoncier;
-    return{impot:Math.max(0,impot),impotNu,impotLMNP,res:resLMNP,resNu,interets,newDeficit,loyerT};
+
+    return{impot,impotNu,impotLMNP,res:resLMNP,resNu,interets};
   }
 
-  var dette1=capR(1);
-  var f1=getFiscalYear(1,emprunt,dette1,0);
-  var resultatFiscal=f1.res;
-  var impot=f1.impot;
-  var impotNu1=f1.impotNu;
-  var cfApresImpot=cashflowBrut-impot/12;
+  // Année 1 pour affichage
+  const dette1=capR(1);
+  const f1=getFiscalYear(1,emprunt,dette1);
+  const resultatFiscal=f1.res;
+  const impot=f1.impot;
+  const impotNu1=f1.impotNu;
+  const cfApresImpot=cashflow-impot/12; // pour affichage an 1 seulement
 
-  var rSP=p.sp500/100/12;
-  var data=[];
-  var beNet=null,beSP=null;
-  var prevDette=emprunt;
-  var impotsCumul=0;
-  var cfNetCumul=0;
-  var spPortfolio=p.apport;
-  var deficitReport=0;
+  const rSP=p.sp500/100/12;
 
-  for(var t=0;t<=p.duree;t++){
-    var dette=capR(t);
-    var basePrice=p.prixAchat+p.travaux*p.travPV/100;
-    var prixVente;
+  const data=[];let beNet=null,beSP=null;
+  let prevDette=emprunt;
+  let impotsCumulAccum=0;
+  let cfNetCumulAccum=0;
+  let cfNegCumulTotal=0; // total des CF négatifs investis côté SP500
+
+  // SP500 côté appart (CF positifs réinvestis) — valeur du portefeuille cumulé
+  let spAppartPortfolio=0;
+  // SP500 côté comparaison (CF négatifs investis) — valeur du portefeuille cumulé
+  let spComparePortfolio=p.apport; // apport investi au départ
+
+  for(let t=0;t<=p.duree;t++){
+    const dette=capR(t);
+    const fiscal=getFiscalYear(t,prevDette,dette);
+
+    // CF net après impôt de cette année (mensuel moyen)
+    const cfNetMensuelAnnee=t>0?(cashflow-fiscal.impot/12):0;
+    const cfNetAnnuel=cfNetMensuelAnnee*12;
+
+    if(t>0){
+      impotsCumulAccum+=fiscal.impot;
+      cfNetCumulAccum+=cfNetAnnuel;
+
+      // Contribution SP500 selon le signe du CF net annuel
+      if(p.reinvestCF&&cfNetAnnuel>0){
+        // CF positif → réinvesti côté appart avec compounding mensuel SP500
+        const cfMens=cfNetMensuelAnnee;
+        for(let m=0;m<12;m++){
+          spAppartPortfolio=(spAppartPortfolio+cfMens)*(1+rSP);
+        }
+      }else{
+        // CF négatif (ou positif sans case) → va côté SP500 comparaison
+        const contrib=Math.max(0,-cfNetMensuelAnnee);
+        cfNegCumulTotal+=contrib*12;
+        for(let m=0;m<12;m++){
+          spComparePortfolio=(spComparePortfolio+contrib)*(1+rSP);
+        }
+        // Si CF positif mais case non cochée → s'accumule juste en cash (déjà dans cfNetCumul)
+      }
+    }
+    prevDette=dette;
+
+    const basePrice=p.prixAchat+p.travaux*p.travPV/100;
+    let prixVente;
     if(p.prixVenteForce>0&&p.anneeVenteForce>0){
       if(t<=p.anneeVenteForce){prixVente=basePrice+(p.prixVenteForce-basePrice)*(t/p.anneeVenteForce);}
       else{prixVente=p.prixVenteForce*Math.pow(1+p.appreci/100,t-p.anneeVenteForce);}
     }else{prixVente=basePrice*Math.pow(1+p.appreci/100,t);}
 
-    if(t===0){
-      data.push({t,prixVente,dette,cfCumul:0,netBrut:0,impotsCum:0,fraisAgRev:0,pvTax:0,fraisImpots:0,
-        netApresImpot:-(p.apport),sp:0,impotAnnee:0,interetsAnnee:0,
-        loyerEffectif,cfNetAnnee:0,cfMensuelNet:0,deficitRestant:0});
-      if(rSP>0){spPortfolio=spPortfolio*Math.pow(1+rSP,12);}
-      continue;
-    }
+    const impotsCum=impotsCumulAccum;
+    const fraisAgRev=prixVente*p.agenceRevente/100;
+    const abat=Math.max(0,1-p.abattPV/100*Math.max(0,t-5));
+    const pvTax=Math.max(0,(prixVente-p.prixAchat-p.travaux)*abat*0.362);
+    const fraisImpots=impotsCum+fraisAgRev+pvTax;
+    const netBrut=prixVente-dette+cfNetCumulAccum;
 
-    var fiscal=getFiscalYear(t,prevDette,dette,deficitReport);
-    deficitReport=fiscal.newDeficit;
-    impotsCumul+=fiscal.impot;
-    var loyerT=fiscal.loyerT;
-    var cashflowBrutT=loyerT/12-mensualite-chargesTotal/12;
-    var cfNetAnnee=cashflowBrutT*12-fiscal.impot;
-    var cfMensuelNet=cfNetAnnee/12;
-    cfNetCumul+=cfNetAnnee;
-
-    if(p.reinvestCF&&cfMensuelNet>0){
-      if(rSP>0){spPortfolio=spPortfolio*Math.pow(1+rSP,12)+cfMensuelNet*(Math.pow(1+rSP,12)-1)/rSP;}
-      else{spPortfolio+=cfMensuelNet*12;}
+    // Côté appart : prix vente - dette + CF nets cumulés (+ portefeuille réinvesti si cochée)
+    let netApresImpot;
+    if(p.reinvestCF&&spAppartPortfolio>0){
+      // Portefeuille appart : soustraire 17.2% PS sur gains
+      const totalInvAppart=cfNetCumulAccum>0?cfNetCumulAccum:0;
+      const gainsAppart=Math.max(0,spAppartPortfolio-totalInvAppart);
+      const spAppartNet=spAppartPortfolio-gainsAppart*0.172;
+      netApresImpot=prixVente-dette-fraisImpots-p.apport+spAppartNet;
     }else{
-      if(rSP>0){spPortfolio=spPortfolio*Math.pow(1+rSP,12);}
+      netApresImpot=netBrut-fraisImpots-p.apport;
     }
-    prevDette=dette;
 
-    var fraisAgRev=prixVente*p.agenceRevente/100;
-    var abat=Math.max(0,1-p.abattPV/100*Math.max(0,t-5));
-    var pvTax=Math.max(0,(prixVente-p.prixAchat-p.travaux)*abat*0.362);
-    var fraisImpots=impotsCumul+fraisAgRev+pvTax;
-    var netBrut=prixVente-dette+cfNetCumul;
-    var netApresImpot=prixVente-dette+cfNetCumul-fraisAgRev-pvTax-p.apport;
-    var spGains=Math.max(0,spPortfolio-p.apport);
-    var sp=spPortfolio-spGains*0.172-p.apport;
+    // Côté SP500 : portefeuille avec contributions variables, net de PS sur gains
+    const totalInvestiSP=p.apport+cfNegCumulTotal;
+    const spGains=Math.max(0,spComparePortfolio-totalInvestiSP);
+    const sp=spComparePortfolio-spGains*0.172-totalInvestiSP;
 
-    if(!beNet&&netApresImpot>=0)beNet=t;
-    if(!beSP&&netApresImpot>=sp)beSP=t;
-
-    data.push({t,prixVente,dette,cfCumul:cfNetCumul,netBrut,impotsCum:impotsCumul,fraisAgRev,pvTax,
-      fraisImpots,netApresImpot,sp,impotAnnee:fiscal.impot,interetsAnnee:fiscal.interets,
-      loyerEffectif:loyerT,cfNetAnnee,cfMensuelNet,deficitRestant:deficitReport});
+    if(!beNet&&t>0&&netApresImpot>=0)beNet=t;
+    if(!beSP&&t>0&&netApresImpot>=sp)beSP=t;
+    data.push({t,prixVente,dette,cf:cfNetCumulAccum,netBrut,impotsCum,fraisAgRev,pvTax,
+      fraisImpots,netApresImpot,sp,cfNetAnnuel,
+      impotAnnee:fiscal.impot,interetsAnnee:fiscal.interets,loyerEffectif});
   }
-
-  return{fraisNotaire,emprunt,mensualite,loyerEffectif,chargesTotal,
-    cashflow:cashflowBrut,rendBrut,resultatFiscal,impot,impotNu1,cfApresImpot,
-    beNet,beSP,data,interets1:f1.interets};
+  return{fraisNotaire,emprunt,mensualite,loyerEffectif,chargesTotal,cashflow,rendBrut,
+    resultatFiscal,impot,impotNu1,cfApresImpot,beNet,beSP,data,interets1:f1.interets};
 }
 
 function render(){
@@ -640,9 +651,9 @@ function render(){
   const be2=document.getElementById("kpi-be2");be2.textContent=c.beSP?"An "+c.beSP:"Jamais";be2.style.color=c.beSP?"var(--blue)":"var(--red)";
   document.getElementById("topSub").textContent=fr(p.prixAchat)+"€ · "+p.loyer+"€/mois · "+p.taux+"%";
   renderChart(c);
-  selectedYear=Math.min(Math.max(selectedYear,0),p.duree);
+  selectedYear=Math.min(selectedYear,p.duree);
   const sl=document.getElementById("yearSlider");
-  sl.min=0;sl.max=p.duree;sl.value=selectedYear;
+  sl.max=p.duree;sl.value=selectedYear;
   sl.style.setProperty("--p",(selectedYear/p.duree*100)+"%");
   document.getElementById("yearVal").textContent=selectedYear;
   renderDecomp(c,selectedYear);
@@ -651,10 +662,9 @@ function render(){
 
 function renderChart(c){
   if(typeof Chart==="undefined")return;
-  const d1=c.data.slice(1); // start at year 1
-  const labels=d1.map(d=>d.t);
-  const appart=d1.map(d=>Math.round(d.netApresImpot));
-  const sp=d1.map(d=>Math.round(d.sp));
+  const labels=c.data.map(d=>d.t);
+  const appart=c.data.map(d=>Math.round(d.netApresImpot));
+  const sp=c.data.map(d=>Math.round(d.sp));
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
   const ctx=document.getElementById("chart").getContext("2d");
   const ga=ctx.createLinearGradient(0,0,0,220);ga.addColorStop(0,"rgba(56,189,248,0.15)");ga.addColorStop(1,"rgba(56,189,248,0)");
@@ -718,9 +728,9 @@ function renderDecomp(c,t){
   document.getElementById("d-dette").textContent="− "+fr(d.dette)+" €";
   document.getElementById("bar-dette").style.width=Math.min(100,d.dette/ref*100)+"%";
   const cfEl=document.getElementById("d-cfCumul");
-  cfEl.textContent=eur(d.cfCumul);cfEl.style.color=d.cfCumul>=0?"var(--green)":"var(--muted)";
-  document.getElementById("bar-cfCumul").style.width=Math.min(100,Math.abs(d.cfCumul)/ref*100)+"%";
-  document.getElementById("bar-cfCumul").style.background=d.cfCumul>=0?"var(--green)":"var(--muted)";
+  cfEl.textContent=eur(d.cf);cfEl.style.color=d.cf>=0?"var(--green)":"var(--muted)";
+  document.getElementById("bar-cfCumul").style.width=Math.min(100,Math.abs(d.cf)/ref*100)+"%";
+  document.getElementById("bar-cfCumul").style.background=d.cf>=0?"var(--green)":"var(--muted)";
   document.getElementById("d-fraisImpots").textContent="− "+fr(d.fraisImpots)+" €";
   document.getElementById("bar-fraisImpots").style.width=Math.min(100,d.fraisImpots/ref*100)+"%";
   const netEl=document.getElementById("d-net");
@@ -1129,22 +1139,16 @@ function renderYearDetail(c,t,p){
   var dPrev=c.data[t-1];
   var detteDebut=dPrev?dPrev.dette:c.emprunt;
   var capitalAnnee=detteDebut-d.dette;
+  var interetsAnnee=d.interetsAnnee||0;
+  var cfNet=c.cfApresImpot;
   function setText(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
   function setColor(id,col){var el=document.getElementById(id);if(el)el.style.color=col;}
   setText("yd-mensualite",fr(c.mensualite)+" €/mois");
-  setText("yd-capital","+ "+fr(capitalAnnee)+" € cette année");setColor("yd-capital","var(--green)");
-  setText("yd-interets","− "+fr(d.interetsAnnee||0)+" € cette année");setColor("yd-interets","var(--red)");
-  var impot=d.impotAnnee||0;
-  setText("yd-impot",fr(impot)+" €/an");
-  setColor("yd-impot",impot>0?"var(--red)":"var(--green)");
-  var defEl=document.getElementById("yd-deficit");
-  if(defEl){
-    if(d.deficitRestant>0){defEl.textContent="Déficit LMNP reporté : "+fr(d.deficitRestant)+" €";}
-    else{defEl.textContent="";}
-  }
-  var cfm=d.cfMensuelNet!==undefined?d.cfMensuelNet:(c.cashflow-impot/12);
-  setText("yd-cashflow",eur(cfm)+"/mois");setColor("yd-cashflow",cfm>=0?"var(--green)":"var(--red)");
+  setText("yd-capital","+ "+fr(capitalAnnee)+" €");setColor("yd-capital","var(--green)");
+  setText("yd-interets","− "+fr(interetsAnnee)+" €");setColor("yd-interets","var(--red)");
+  setText("yd-cashflow",eur(cfNet)+"/mois");setColor("yd-cashflow",cfNet>=0?"var(--green)":"var(--red)");
   setText("yd-loyer",fr(d.loyerEffectif||c.loyerEffectif)+" €/an");
+  setText("yd-impot",fr(d.impotAnnee||0)+" €/an");
   var pv=d.prixVente-p.prixAchat-p.travaux;
   setText("yd-pv",(pv>=0?"+":"")+fr(pv)+" €");setColor("yd-pv",pv>=0?"var(--green)":"var(--red)");
   setText("yd-dette",fr(d.dette)+" €");
