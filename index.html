@@ -345,11 +345,66 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
   </div>
 </div>
 
+<div class="page" id="page-suivi">
+  <div class="section-title">📍 Bien suivi</div>
+  <div id="suiviPropPicker" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;"></div>
+
+  <div id="suiviBody" style="display:none;">
+    <div class="card" style="padding:12px 14px;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="flex:1;">
+          <span class="prompt-label" style="margin-top:0;">Date d'achat</span>
+          <input class="prompt-input" type="date" id="svDateAchat" style="margin-top:4px;" onchange="svSaveConfig()">
+        </div>
+        <div style="flex:1;">
+          <span class="prompt-label" style="margin-top:0;">Scénario de référence</span>
+          <select class="prompt-input" id="svRefScen" style="margin-top:4px;" onchange="svSaveConfig()"></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="svKpis" class="kpi-grid" style="margin-bottom:12px;"></div>
+
+    <div class="chart-card" style="margin-bottom:12px;">
+      <div class="chart-head">
+        <div><div class="ct">Cash-flow cumulé · réel vs prévu</div><div class="cs">Mois par mois depuis l'achat</div></div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px;"><canvas id="svChart"></canvas></div>
+    </div>
+
+    <div class="card" style="padding:14px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <button class="btn btn-ghost" style="padding:5px 12px;" onclick="svShiftMonth(-1)">←</button>
+        <span id="svMoisLabel" style="font-size:14px;font-weight:600;"></span>
+        <button class="btn btn-ghost" style="padding:5px 12px;" onclick="svShiftMonth(1)">→</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><span class="prompt-label" style="margin-top:0;">💰 Loyer perçu</span><input class="prompt-input" type="number" id="svLoyer" style="margin-top:4px;"></div>
+        <div><span class="prompt-label" style="margin-top:0;">🏦 Mensualité</span><input class="prompt-input" type="number" id="svMensualite" style="margin-top:4px;"></div>
+        <div><span class="prompt-label" style="margin-top:0;">📄 Charges</span><input class="prompt-input" type="number" id="svCharges" style="margin-top:4px;"></div>
+        <div><span class="prompt-label" style="margin-top:0;">🏛️ Impôts</span><input class="prompt-input" type="number" id="svImpots" style="margin-top:4px;"></div>
+      </div>
+      <div style="margin-top:8px;"><span class="prompt-label" style="margin-top:0;">🔨 Autres dépenses (travaux, imprévus...)</span><input class="prompt-input" type="number" id="svAutres" style="margin-top:4px;"></div>
+      <div style="margin-top:8px;"><input class="prompt-input" id="svNoteM" placeholder="Note du mois (optionnel)" style="margin-top:0;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-primary" style="flex:2;padding:11px;" onclick="svSaveMonth()">Enregistrer ce mois</button>
+        <button class="btn btn-danger" style="flex:1;padding:11px;" onclick="svClearMonth()">Effacer</button>
+      </div>
+      <div id="svMoisResult" style="margin-top:10px;text-align:center;font-size:13px;font-family:monospace;"></div>
+    </div>
+
+    <div class="section-title">Historique mensuel</div>
+    <div class="card" id="svHistory" style="padding:4px 14px;"></div>
+  </div>
+  <div id="suiviEmpty" class="empty">Sélectionne un bien ci-dessus pour démarrer son suivi.</div>
+</div>
+
 <div class="bottomnav">
   <div class="navbtn active" data-page="saisie" onclick="goPage('saisie')"><span class="ic">&#128221;</span>Saisie</div>
   <div class="navbtn" data-page="resultats" onclick="goPage('resultats')"><span class="ic">&#127919;</span>R&#233;sultats</div>
   <div class="navbtn" data-page="simulation" onclick="goPage('simulation')"><span class="ic">&#128200;</span>Simulation</div>
   <div class="navbtn" data-page="comparer" onclick="goPage('comparer')"><span class="ic">⚖️</span>Comparer</div>
+  <div class="navbtn" data-page="suivi" onclick="goPage('suivi')"><span class="ic">📍</span>Suivi</div>
   <div class="navbtn" data-page="biens" onclick="goPage('biens')"><span class="ic">&#128194;</span>Mes biens</div>
 </div>
 
@@ -773,6 +828,7 @@ function goPage(name){
   if(name==="biens")renderScenarioList();
   if(name==="simulation")render();
   if(name==="comparer"){renderComparePicker();renderCompare();}
+  if(name==="suivi")renderSuiviPage();
 }
 
 function getSc(){try{return JSON.parse(localStorage.getItem("rentalScenarios")||"[]");}catch{return[];}}
@@ -920,11 +976,283 @@ function renderScenarioList(){
       +"<div style='display:flex;align-items:center;justify-content:space-between;'>"
       +"<div style='font-size:14px;font-weight:600;'>"+escapeHtml(prop.name)+"</div>"
       +"<div style='display:flex;gap:5px;'>"
+      +"<button class='btn btn-ghost' style='font-size:11px;padding:4px 8px;"+(prop.suivi&&prop.suivi.dateAchat?"color:var(--green);border-color:var(--green);":"")+"' data-pid='"+prop.id+"' onclick='goSuivi(this.dataset.pid,event)'>📍</button>"
       +"<button class='btn btn-ghost' style='font-size:11px;padding:4px 8px;' data-pid='"+prop.id+"' onclick='openEditModal(this.dataset.pid,event)'>✎</button>"
       +"<button class='"+delPropCls+"' style='font-size:11px;padding:4px 8px;' data-pid='"+prop.id+"' onclick='deleteProperty(this.dataset.pid,event)'>"+delPropLabel+"</button>"
       +"</div></div>"+notes+urlBtn+"</div></div>"
       +"<div style='padding:0 4px;'>"+scenRows+"</div>"
       +"<button class='btn btn-ghost' style='width:100%;margin-top:8px;font-size:12px;' data-pid='"+prop.id+"' onclick='openAddScenarioModal(this.dataset.pid,event)'>+ Ajouter un scénario</button>"
+      +"</div>";
+  }).join("");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODULE SUIVI — suivi réel mensuel du bien vs scénarios prévus
+// Données : prop.suivi = {dateAchat, refScenId, mois:{"2025-03":{loyer,mensualite,charges,impots,autres,note}}}
+// ══════════════════════════════════════════════════════════════════
+let svPropId=null;
+let svCurrentMonth=null; // "YYYY-MM"
+let svChartInstance=null;
+
+function goSuivi(propertyId,e){
+  if(e)e.stopPropagation();
+  svPropId=propertyId;
+  goPage("suivi");
+}
+
+function svMonthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function svMonthLabel(key){
+  const[y,m]=key.split("-");
+  return new Date(y,m-1,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+}
+function svMonthsList(dateAchat){
+  // Liste des mois de l'achat à aujourd'hui
+  const out=[];
+  const d=new Date(dateAchat+"-01"!==dateAchat?dateAchat:dateAchat);
+  const start=new Date(dateAchat);start.setDate(1);
+  const now=new Date();now.setDate(1);
+  const cur=new Date(start);
+  while(cur<=now){out.push(svMonthKey(cur));cur.setMonth(cur.getMonth()+1);}
+  return out;
+}
+
+function svGetProp(){
+  const props=migrate(getSc());
+  return props.find(p=>p.id===svPropId);
+}
+function svSaveProp(fn){
+  const props=migrate(getSc());
+  const i=props.findIndex(p=>p.id===svPropId);if(i<0)return;
+  if(!props[i].suivi)props[i].suivi={mois:{}};
+  if(!props[i].suivi.mois)props[i].suivi.mois={};
+  fn(props[i].suivi);
+  setSc(props);
+}
+
+function renderSuiviPage(){
+  const props=migrate(getSc());
+  // Picker de bien
+  const picker=document.getElementById("suiviPropPicker");
+  if(!props.length){
+    picker.innerHTML="<div style='color:var(--muted);font-size:13px;'>Aucun bien enregistré.</div>";
+    document.getElementById("suiviBody").style.display="none";
+    document.getElementById("suiviEmpty").style.display="";
+    return;
+  }
+  picker.innerHTML=props.slice().reverse().map(p=>{
+    const active=p.id===svPropId;
+    const tracked=p.suivi&&p.suivi.dateAchat;
+    return "<button class='scen-tag"+(active?" active":"")+"' data-pid='"+p.id+"' onclick='svPropId=this.dataset.pid;renderSuiviPage()'>"
+      +(tracked?"📍 ":"")+escapeHtml(p.name)+"</button>";
+  }).join("");
+
+  const prop=svGetProp();
+  if(!prop){
+    document.getElementById("suiviBody").style.display="none";
+    document.getElementById("suiviEmpty").style.display="";
+    return;
+  }
+  document.getElementById("suiviBody").style.display="";
+  document.getElementById("suiviEmpty").style.display="none";
+
+  const suivi=prop.suivi||{mois:{}};
+  document.getElementById("svDateAchat").value=suivi.dateAchat||"";
+
+  // Sélecteur de scénario de référence
+  const refSel=document.getElementById("svRefScen");
+  refSel.innerHTML=(prop.scenarios||[]).map(s=>
+    "<option value='"+s.id+"'"+(suivi.refScenId===s.id?" selected":"")+">"+escapeHtml(s.label)+"</option>"
+  ).join("");
+
+  if(!suivi.dateAchat){
+    document.getElementById("svKpis").innerHTML="<div style='grid-column:1/-1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:12.5px;color:var(--muted);'>Renseigne la date d'achat pour démarrer le suivi mensuel.</div>";
+    document.getElementById("svHistory").innerHTML="";
+    document.getElementById("svMoisLabel").textContent="—";
+    if(svChartInstance){svChartInstance.destroy();svChartInstance=null;}
+    return;
+  }
+
+  // Mois courant par défaut = dernier mois
+  const months=svMonthsList(suivi.dateAchat);
+  if(!svCurrentMonth||!months.includes(svCurrentMonth))svCurrentMonth=months[months.length-1];
+
+  svRenderMonthForm(prop,suivi);
+  svRenderKpis(prop,suivi,months);
+  svRenderChart(prop,suivi,months);
+  svRenderHistory(prop,suivi,months);
+}
+
+function svSaveConfig(){
+  svSaveProp(s=>{
+    s.dateAchat=document.getElementById("svDateAchat").value;
+    s.refScenId=document.getElementById("svRefScen").value;
+  });
+  renderSuiviPage();renderScenarioList();
+}
+
+// ── Formulaire mensuel ────────────────────────────────────────────
+function svGetRefScen(prop,suivi){
+  const scens=prop.scenarios||[];
+  return scens.find(s=>s.id===suivi.refScenId)||scens[0];
+}
+
+function svDefaults(prop,suivi){
+  // Pré-remplissage depuis le scénario de référence
+  const ref=svGetRefScen(prop,suivi);
+  if(!ref)return{loyer:0,mensualite:0,charges:0,impots:0};
+  const c=compute(ref.data);
+  return{
+    loyer:Math.round(ref.data.loyer),
+    mensualite:Math.round(c.mensualite),
+    charges:Math.round(c.chargesTotal/12),
+    impots:0
+  };
+}
+
+function svRenderMonthForm(prop,suivi){
+  document.getElementById("svMoisLabel").textContent=svMonthLabel(svCurrentMonth);
+  const saved=(suivi.mois||{})[svCurrentMonth];
+  const def=svDefaults(prop,suivi);
+  document.getElementById("svLoyer").value=saved?saved.loyer:def.loyer;
+  document.getElementById("svMensualite").value=saved?saved.mensualite:def.mensualite;
+  document.getElementById("svCharges").value=saved?saved.charges:def.charges;
+  document.getElementById("svImpots").value=saved?saved.impots:def.impots;
+  document.getElementById("svAutres").value=saved?saved.autres:0;
+  document.getElementById("svNoteM").value=saved?(saved.note||""):"";
+  const res=document.getElementById("svMoisResult");
+  if(saved){
+    const net=saved.loyer-saved.mensualite-saved.charges-saved.impots-saved.autres;
+    res.innerHTML="✓ Enregistré · Net du mois : <span style='color:"+(net>=0?"var(--green)":"var(--red)")+";'>"+(net>=0?"+":"−")+fr(Math.abs(net))+" €</span>";
+  }else{
+    res.innerHTML="<span style='color:var(--muted);'>Mois non enregistré (valeurs pré-remplies du scénario)</span>";
+  }
+}
+
+function svShiftMonth(dir){
+  const prop=svGetProp();if(!prop||!prop.suivi||!prop.suivi.dateAchat)return;
+  const months=svMonthsList(prop.suivi.dateAchat);
+  const idx=months.indexOf(svCurrentMonth);
+  const ni=idx+dir;
+  if(ni<0||ni>=months.length)return;
+  svCurrentMonth=months[ni];
+  svRenderMonthForm(prop,prop.suivi);
+}
+
+function svSaveMonth(){
+  svSaveProp(s=>{
+    s.mois[svCurrentMonth]={
+      loyer:parseFloat(document.getElementById("svLoyer").value)||0,
+      mensualite:parseFloat(document.getElementById("svMensualite").value)||0,
+      charges:parseFloat(document.getElementById("svCharges").value)||0,
+      impots:parseFloat(document.getElementById("svImpots").value)||0,
+      autres:parseFloat(document.getElementById("svAutres").value)||0,
+      note:document.getElementById("svNoteM").value.trim()
+    };
+  });
+  renderSuiviPage();
+}
+
+function svClearMonth(){
+  svSaveProp(s=>{delete s.mois[svCurrentMonth];});
+  renderSuiviPage();
+}
+
+function svMonthNet(m){return m.loyer-m.mensualite-m.charges-m.impots-m.autres;}
+
+// ── Prévu par scénario, cumul mensuel ──────────────────────────────
+function svPrevuCumulMensuel(scen,nbMois){
+  // Interpolation mensuelle du cfCumul annuel du scénario
+  const c=compute(scen.data);
+  const out=[];
+  for(let m=1;m<=nbMois;m++){
+    const y=m/12;
+    const yf=Math.floor(y),frac=y-yf;
+    const a=c.data[Math.min(yf,scen.data.duree)]?.cfCumul||0;
+    const b=c.data[Math.min(yf+1,scen.data.duree)]?.cfCumul||a;
+    out.push(a+(b-a)*frac);
+  }
+  return out;
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────
+function svRenderKpis(prop,suivi,months){
+  const saved=months.filter(k=>suivi.mois&&suivi.mois[k]);
+  const cfReel=saved.reduce((acc,k)=>acc+svMonthNet(suivi.mois[k]),0);
+  const nbSaisis=saved.length;
+  const nbTotal=months.length;
+  const ref=svGetRefScen(prop,suivi);
+  let cfPrevu=0,ecart=0;
+  if(ref&&nbSaisis>0){
+    const prevus=svPrevuCumulMensuel(ref,nbTotal);
+    cfPrevu=prevus[nbSaisis-1]||0; // prévu au même nombre de mois que saisis
+    ecart=cfReel-cfPrevu;
+  }
+  const moyMens=nbSaisis>0?cfReel/nbSaisis:0;
+
+  document.getElementById("svKpis").innerHTML=
+    "<div class='kpi'><div class='kl'>CF réel cumulé</div><div class='kv' style='color:"+(cfReel>=0?"var(--green)":"var(--red)")+";'>"+(cfReel>=0?"+":"−")+fr(Math.abs(cfReel))+" €</div><div class='ks'>"+nbSaisis+"/"+nbTotal+" mois saisis</div></div>"
+    +"<div class='kpi'><div class='kl'>Écart vs prévu</div><div class='kv' style='color:"+(ecart>=0?"var(--green)":"var(--red)")+";'>"+(ecart>=0?"+":"−")+fr(Math.abs(ecart))+" €</div><div class='ks'>Réf. "+(ref?escapeHtml(ref.label):"—")+" : "+(cfPrevu>=0?"+":"−")+fr(Math.abs(cfPrevu))+" €</div></div>"
+    +"<div class='kpi'><div class='kl'>Moyenne / mois</div><div class='kv' style='color:"+(moyMens>=0?"var(--green)":"var(--red)")+";font-size:18px;'>"+(moyMens>=0?"+":"−")+fr(Math.abs(moyMens))+" €</div><div class='ks'>Sur les mois saisis</div></div>"
+    +"<div class='kpi'><div class='kl'>Depuis l'achat</div><div class='kv' style='font-size:18px;'>"+nbTotal+" mois</div><div class='ks'>"+new Date(suivi.dateAchat).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})+"</div></div>";
+}
+
+// ── Courbe réel vs scénarios ───────────────────────────────────────
+function svRenderChart(prop,suivi,months){
+  if(typeof Chart==="undefined")return;
+  if(svChartInstance){svChartInstance.destroy();svChartInstance=null;}
+  const ctx=document.getElementById("svChart").getContext("2d");
+
+  const labels=months.map(k=>{const[y,m]=k.split("-");return m+"/"+y.slice(2);});
+
+  // Réel : cumul, null pour les mois non saisis après le dernier saisi
+  let cum=0;
+  const reelData=[];
+  let lastSaved=-1;
+  months.forEach((k,i)=>{if(suivi.mois&&suivi.mois[k])lastSaved=i;});
+  months.forEach((k,i)=>{
+    if(suivi.mois&&suivi.mois[k]){cum+=svMonthNet(suivi.mois[k]);reelData.push(Math.round(cum));}
+    else if(i<=lastSaved){reelData.push(Math.round(cum));} // mois manquant au milieu : plat
+    else{reelData.push(null);}
+  });
+
+  const datasets=[{label:"Réel",data:reelData,borderColor:"#38bdf8",backgroundColor:"transparent",
+    borderWidth:3,tension:0.3,pointRadius:2,pointHoverRadius:5,spanGaps:true}];
+
+  const colors=["#34d399","#f59e0b","#a78bfa","#f87171"];
+  (prop.scenarios||[]).forEach((scen,i)=>{
+    const prevus=svPrevuCumulMensuel(scen,months.length);
+    datasets.push({label:escapeHtml(scen.label),data:prevus.map(v=>Math.round(v)),
+      borderColor:colors[i%colors.length],backgroundColor:"transparent",
+      borderWidth:1.5,borderDash:[5,4],tension:0.3,pointRadius:0,pointHoverRadius:4});
+  });
+
+  svChartInstance=new Chart(ctx,{type:"line",data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      interaction:{mode:"index",intersect:false},
+      plugins:{legend:{display:true,labels:{color:"#8aa0c0",font:{size:10},boxWidth:10,padding:8}},
+        tooltip:{backgroundColor:"#1e293b",borderColor:"#334155",borderWidth:1,padding:10,
+          titleColor:"#e8eef8",bodyColor:"#cbd5e1",
+          callbacks:{label:i=>" "+i.dataset.label+": "+(i.raw===null?"—":fr(i.raw)+" €")}}},
+      scales:{
+        x:{grid:{color:"#0f1a2e",drawTicks:false},ticks:{color:"#5b7299",font:{size:9},maxTicksLimit:8},border:{display:false}},
+        y:{grid:{color:"#0f1a2e",drawTicks:false},ticks:{color:"#5b7299",font:{size:9},callback:v=>frK(v)},border:{display:false}}
+      }}});
+}
+
+// ── Historique ─────────────────────────────────────────────────────
+function svRenderHistory(prop,suivi,months){
+  const el=document.getElementById("svHistory");
+  const saved=months.filter(k=>suivi.mois&&suivi.mois[k]).reverse();
+  if(!saved.length){el.innerHTML="<div style='color:var(--muted);font-size:12px;padding:12px 0;'>Aucun mois enregistré.</div>";return;}
+  el.innerHTML=saved.map(k=>{
+    const m=suivi.mois[k];
+    const net=svMonthNet(m);
+    return "<div style='display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;' onclick='svCurrentMonth=\""+k+"\";svRenderMonthForm(svGetProp(),svGetProp().suivi);window.scrollTo({top:300,behavior:\"smooth\"})'>"
+      +"<div><div style='font-size:13px;font-weight:500;'>"+svMonthLabel(k)+"</div>"
+      +"<div style='font-size:11px;color:var(--muted);'>Loyer "+fr(m.loyer)+"€ · Mens. "+fr(m.mensualite)+"€ · Charges "+fr(m.charges)+"€"+(m.impots?" · Impôts "+fr(m.impots)+"€":"")+(m.autres?" · Autres "+fr(m.autres)+"€":"")+"</div>"
+      +(m.note?"<div style='font-size:11px;color:var(--muted);font-style:italic;'>"+escapeHtml(m.note)+"</div>":"")
+      +"</div>"
+      +"<span style='font-family:monospace;font-size:14px;font-weight:600;color:"+(net>=0?"var(--green)":"var(--red)")+";'>"+(net>=0?"+":"−")+fr(Math.abs(net))+" €</span>"
       +"</div>";
   }).join("");
 }
