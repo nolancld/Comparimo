@@ -533,7 +533,10 @@ const eur=n=>(n<0?"−":"+")+fr(Math.abs(n))+" €";
 const frK=n=>{const a=Math.abs(n);return(n<0?"−":"")+( a>=1000?new Intl.NumberFormat("fr-FR",{maximumFractionDigits:1}).format(a/1000)+" k€":fr(a)+" €");};
 
 
-function compute(p){
+function compute(pRaw){
+  // Fusionne avec les valeurs par défaut pour éviter les NaN sur d'anciens scénarios
+  // sauvegardés avant l'ajout de nouveaux paramètres
+  const p=Object.assign({},DEFAULTS,pRaw);
   const fraisNotaire=p.prixAchat*0.08;
   const emprunt=p.prixAchat+fraisNotaire+p.travaux+p.fraisAgence-p.apport;
   const tauxM=p.taux/100/12;
