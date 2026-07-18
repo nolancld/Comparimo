@@ -948,6 +948,18 @@ function loadScenario(propertyId,scenId){
 
 function escapeHtml(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
 
+function toggleScenAccordion(propId,e){
+  if(e)e.stopPropagation();
+  const body=document.getElementById("scenBody-"+propId);
+  const chevron=document.getElementById("scenChevron-"+propId);
+  if(!body)return;
+  const isOpen=body.style.display!=="none";
+  body.style.display=isOpen?"none":"block";
+  if(chevron)chevron.style.transform=isOpen?"rotate(0deg)":"rotate(180deg)";
+}
+
+let scenAccordionOpen={}; // propId -> bool, persists during session
+
 function renderScenarioList(){
   const props=migrate(getSc());const el=document.getElementById("scenarioList");
   if(!props.length){el.innerHTML="<div class='empty'>Aucun bien enregistré.<br>Remplis la saisie puis appuie sur 💾 pour sauvegarder.</div>";return;}
@@ -957,7 +969,11 @@ function renderScenarioList(){
     const urlBtn=prop.url?"<button class='btn btn-ghost' style='font-size:11px;padding:3px 8px;margin-top:4px;' data-url='"+escapeHtml(prop.url)+"' onclick='openLink(this.dataset.url,event)'>🔗 Voir l&#39;annonce</button>":"";
     const delPropLabel=deleteArmedId===prop.id?"⚠️ Supprimer ?":"🗑";
     const delPropCls=deleteArmedId===prop.id?"btn btn-danger-armed":"btn btn-danger";
-    const scenRows=(prop.scenarios||[]).map(scen=>{
+    const scenarios=prop.scenarios||[];
+    const activeScen=scenarios.find(s=>currentPropertyId===prop.id&&currentScenarioId===s.id);
+    const isOpen=!!scenAccordionOpen[prop.id];
+
+    const scenRows=scenarios.map(scen=>{
       const c=compute(scen.data);
       const isActive=currentPropertyId===prop.id&&currentScenarioId===scen.id;
       const delKey=prop.id+"_"+scen.id;
@@ -970,6 +986,11 @@ function renderScenarioList(){
         +"<button class='"+delScenCls+"' style='font-size:11px;padding:4px 8px;' data-pid='"+prop.id+"' data-sid='"+scen.id+"' onclick='deleteScenario(this.dataset.pid,this.dataset.sid,event)'>"+delScenLabel+"</button>"
         +"</div></div>";
     }).join("");
+
+    const summaryTxt=activeScen
+      ?escapeHtml(activeScen.label)+" actif"
+      :scenarios.length+" scénario"+(scenarios.length>1?"s":"");
+
     return "<div style='padding:14px;border-bottom:1px solid var(--border);'>"
       +"<div style='display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;'>"
       +thumb+"<div style='flex:1;min-width:0;'>"
@@ -980,8 +1001,13 @@ function renderScenarioList(){
       +"<button class='btn btn-ghost' style='font-size:11px;padding:4px 8px;' data-pid='"+prop.id+"' onclick='openEditModal(this.dataset.pid,event)'>✎</button>"
       +"<button class='"+delPropCls+"' style='font-size:11px;padding:4px 8px;' data-pid='"+prop.id+"' onclick='deleteProperty(this.dataset.pid,event)'>"+delPropLabel+"</button>"
       +"</div></div>"+notes+urlBtn+"</div></div>"
-      +"<div style='padding:0 4px;'>"+scenRows+"</div>"
+      +"<button style='width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;cursor:pointer;margin-top:6px;' data-pid='"+prop.id+"' onclick='scenAccordionOpen[this.dataset.pid]=!scenAccordionOpen[this.dataset.pid];renderScenarioList()'>"
+      +"<span style='font-size:12.5px;color:var(--label);'>📊 "+summaryTxt+"</span>"
+      +"<span id='scenChevron-"+prop.id+"' style='color:var(--muted);font-size:11px;transition:transform .15s;transform:rotate("+(isOpen?"180":"0")+"deg);'>▾</span>"
+      +"</button>"
+      +"<div id='scenBody-"+prop.id+"' style='display:"+(isOpen?"block":"none")+";padding:0 4px;'>"+scenRows
       +"<button class='btn btn-ghost' style='width:100%;margin-top:8px;font-size:12px;' data-pid='"+prop.id+"' onclick='openAddScenarioModal(this.dataset.pid,event)'>+ Ajouter un scénario</button>"
+      +"</div>"
       +"</div>";
   }).join("");
 }
