@@ -216,6 +216,11 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
     </div>
     <div id="autresFraisRows"></div>
     <button class="btn btn-ghost" style="width:calc(100% - 32px);margin:8px 16px 12px;font-size:12px;" onclick="addAutresFraisRow()">+ Ajouter un autre frais</button>
+    <label class="field" for="travauxGonfles" style="cursor:pointer;">
+      <span style="font-size:13.5px;color:var(--label);flex:1;">&#128200; Travaux gonfl&#233;s &rarr; surplus en SP500</span>
+      <div class="input-wrap"><input type="checkbox" id="travauxGonfles" style="width:20px;height:20px;accent-color:var(--blue);cursor:pointer;" onchange="render();saveDraft()"></div>
+    </label>
+    <div class="field" id="surplusRow" style="display:none;"><label style="font-size:12px;color:var(--muted);">&#8627; Montant surplus emprunt&#233;</label><div class="input-wrap"><input type="number" id="surplusMontant" step="1000"><span class="unit">&#8364;</span></div></div>
     <div class="advanced-toggle" onclick="toggleAdvanced('acq-adv',this)"><span class="arrow">&#9658;</span> Affiner</div>
     <div class="advanced-fields" id="acq-adv">
       <div class="field"><label>Frais d'agence (achat)</label><div class="input-wrap"><input type="number" id="fraisAgence" step="100"><span class="unit">&#8364;</span></div></div>
@@ -269,11 +274,6 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
       <span style="font-size:13.5px;color:var(--label);flex:1;">&#9851;&#65039; R&#233;investir CF positifs (SP500 PEA)</span>
       <div class="input-wrap"><input type="checkbox" id="reinvestCF" style="width:20px;height:20px;accent-color:var(--blue);cursor:pointer;" onchange="render();saveDraft()"></div>
     </label>
-    <label class="field" for="travauxGonfles" style="cursor:pointer;">
-      <span style="font-size:13.5px;color:var(--label);flex:1;">&#128200; Travaux gonfl&#233;s &rarr; surplus en SP500</span>
-      <div class="input-wrap"><input type="checkbox" id="travauxGonfles" style="width:20px;height:20px;accent-color:var(--blue);cursor:pointer;" onchange="render();saveDraft()"></div>
-    </label>
-    <div class="field" id="surplusRow" style="display:none;"><label style="font-size:12px;color:var(--muted);">&#8627; Montant surplus emprunt&#233;</label><div class="input-wrap"><input type="number" id="surplusMontant" step="1000"><span class="unit">&#8364;</span></div></div>
   </div>
 </div>
 
@@ -922,6 +922,18 @@ function render(){
   const p=getInputs();
   const c=compute(p);
   lastC=c;lastP=p;
+  // Bandeau récap Acquisition
+  var reEl=document.getElementById("recap-emprunt");
+  if(reEl)reEl.textContent=fr(c.emprunt)+"\u00a0€";
+  var raEl=document.getElementById("recap-apport");
+  if(raEl)raEl.textContent=(p.apport>0?fr(p.apport)+"\u00a0€":"aucun (0\u00a0€)");
+  var surplusLine=document.getElementById("recap-surplus-line");
+  var surplusVal=(p.travauxGonfles&&p.surplusMontant>0)?p.surplusMontant:0;
+  if(surplusLine){
+    surplusLine.style.display=surplusVal>0?"flex":"none";
+    var rsEl=document.getElementById("recap-surplus");
+    if(rsEl)rsEl.textContent=fr(surplusVal)+"\u00a0€";
+  }
   const cfCol=c.cashflow>=0?"var(--green)":"var(--red)";
   const cfEl=document.getElementById("kpi-cashflow");
   cfEl.textContent=eur(c.cashflow);cfEl.style.color=cfCol;
@@ -964,7 +976,7 @@ function render(){
     }
   }
   const be2=document.getElementById("kpi-be2");be2.textContent=c.beSP?"An "+c.beSP:"Jamais";be2.style.color=c.beSP?"var(--blue)":"var(--red)";
-  document.getElementById("topSub").textContent=fr(p.prixAchat)+"€ · "+p.loyer+"€/mois · "+p.taux+"%";
+  document.getElementById("topSub").textContent="Emprunt "+fr(c.emprunt)+"€ · apport "+(p.apport>0?fr(p.apport)+"€":"0€")+((p.travauxGonfles&&p.surplusMontant>0)?" · +"+fr(p.surplusMontant)+"€ SP500":"");
   renderChart(c);
   selectedYear=Math.min(Math.max(selectedYear,0),p.duree);
   const sl=document.getElementById("yearSlider");
