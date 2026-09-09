@@ -761,11 +761,12 @@ function compute(pRaw){
     }else{prixVente=basePrice*Math.pow(1+p.appreci/100,t);}
 
     if(t===0){
-      // An 0 : jour de l'achat. Même formule que les autres années pour rester cohérent :
-      // si tu revendais immédiatement, tu récupères le prix, tu rembourses la banque,
-      // et ton apport reste sorti de ta poche.
-      var net0=prixVente-dette-p.apport;
-      data.push({t,prixVente,dette,cfCumul:0,netBrut:prixVente-dette,impotsCum:0,fraisAgRev:0,pvTax:0,equityLiq:prixVente-dette,
+      // An 0 : jour de l'achat. Le surplus (travaux gonflés) est déjà placé en SP500.
+      // Si tu revendais immédiatement : prix - dette (qui inclut le surplus) - apport
+      // + le portefeuille surplus que tu liquides pour rembourser ce même surplus.
+      var spAppartNet0=surplus; // au jour 0, le portefeuille = surplus (pas encore de gain)
+      var net0=prixVente-dette-p.apport+spAppartNet0;
+      data.push({t,prixVente,dette,cfCumul:0,netBrut:prixVente-dette,impotsCum:0,fraisAgRev:0,pvTax:0,equityLiq:prixVente-dette+spAppartNet0,
         fraisImpots:0,netApresImpot:net0,sp:0,spBrutValue:p.apport,spTotalInvesti:p.apport,impotAnnee:0,interetsAnnee:0,
         loyerEffectif,cfNetAnnee:0,cfMensuelNet:0,deficitRestant:0,resAnnee:0});
       continue;
