@@ -828,15 +828,16 @@ function compute(pRaw){
       spAppartNet=spAppartPortfolio-gainsAppart*0.172;
     }
     // Net appart. Le cash-flow cumulé est déjà net d'impôt.
-    // Si reinvestCF : les CF positifs sont dans spAppartNet, on utilise cfNegCumul à la place.
+    // Le surplus emprunté est DÉJÀ dans la dette (emprunt gonflé) → on rembourse la dette
+    // à la revente. Le portefeuille SP500 entier (spAppartNet) sert justement à ça :
+    // on le liquide pour rembourser le surplus, et on garde la plus-value.
+    // Donc on ajoute spAppartNet complet, PAS spAppartNet - surplus (sinon double déduction).
     var netApresImpot;
     if(p.reinvestCF&&(spAppartPortfolio-surplus)>0){
       netApresImpot=prixVente-dette+cfNegCumul-fraisAgRev-pvTax-p.apport+spAppartNet;
     }else{
-      netApresImpot=prixVente-dette+cfNetCumul-fraisAgRev-pvTax-p.apport+(spAppartNet-surplus);
+      netApresImpot=prixVente-dette+cfNetCumul-fraisAgRev-pvTax-p.apport+spAppartNet;
     }
-    // Note : (spAppartNet - surplus) = gain net du surplus au-dessus du capital emprunté.
-    // Le surplus lui-même a gonflé l'emprunt (donc la dette et les mensualités déjà comptées).
 
     // Net SP500 : portfolio - PS sur gains - capital total investi
     var spGains=Math.max(0,spComparePortfolio-spCompareTotalInvesti);
@@ -846,7 +847,7 @@ function compute(pRaw){
     if(!beNet&&netApresImpot>=0)beNet=t;
     if(!beSP&&netApresImpot>=sp)beSP=t;
 
-    var equityLiq=prixVente-dette-fraisAgRev-pvTax-fraisSortieFixe; // net de tous frais de sortie
+    var equityLiq=prixVente-dette-fraisAgRev-pvTax-fraisSortieFixe+spAppartNet; // net de frais, + portefeuille surplus liquidé
     data.push({t,prixVente,dette,cfCumul:cfNetCumul,netBrut,impotsCum:impotsCumul,fraisAgRev,pvTax,pvTaxIR,pvTaxPS,fraisSortieFixe,equityLiq,
       fraisImpots,netApresImpot,sp,spBrutValue,spTotalInvesti:spCompareTotalInvesti,
       impotAnnee:fiscal.impot,interetsAnnee:fiscal.interets,
@@ -922,18 +923,6 @@ function render(){
   const p=getInputs();
   const c=compute(p);
   lastC=c;lastP=p;
-  // Bandeau récap Acquisition
-  var reEl=document.getElementById("recap-emprunt");
-  if(reEl)reEl.textContent=fr(c.emprunt)+"\u00a0€";
-  var raEl=document.getElementById("recap-apport");
-  if(raEl)raEl.textContent=(p.apport>0?fr(p.apport)+"\u00a0€":"aucun (0\u00a0€)");
-  var surplusLine=document.getElementById("recap-surplus-line");
-  var surplusVal=(p.travauxGonfles&&p.surplusMontant>0)?p.surplusMontant:0;
-  if(surplusLine){
-    surplusLine.style.display=surplusVal>0?"flex":"none";
-    var rsEl=document.getElementById("recap-surplus");
-    if(rsEl)rsEl.textContent=fr(surplusVal)+"\u00a0€";
-  }
   const cfCol=c.cashflow>=0?"var(--green)":"var(--red)";
   const cfEl=document.getElementById("kpi-cashflow");
   cfEl.textContent=eur(c.cashflow);cfEl.style.color=cfCol;
