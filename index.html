@@ -416,9 +416,18 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
         <button class="btn btn-ghost" style="font-size:16px;padding:5px 12px;" onclick="closeCmpFullscreen()">&#215;</button>
       </div>
     </div>
-    <div id="cmpFsBody" style="flex:1;overflow:auto;background:var(--card);border-radius:14px;padding:16px;">
-      <div id="cmpFsChartWrap" style="display:none;height:100%;min-height:400px;"><canvas id="cmpFsChart"></canvas></div>
-      <div id="cmpFsTableWrap" style="display:none;overflow:auto;"></div>
+    <div id="cmpFsBody" style="flex:1;overflow:hidden;background:var(--card);border-radius:14px;touch-action:none;position:relative;">
+      <div id="cmpFsImgWrap" style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:8px;">
+        <div id="cmpFsLoading" style="color:var(--muted);font-size:13px;padding:40px;">Génération de l'image…</div>
+        <img id="cmpFsImg" style="display:none;max-width:none;width:100%;height:auto;border-radius:8px;" alt="" ondblclick="cmpZoomToggle()">
+      </div>
+      <canvas id="cmpFsChart" style="display:none;"></canvas>
+      <div id="cmpFsTableWrap" style="display:none;"></div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:10px;flex-shrink:0;">
+      <button class="btn btn-ghost" style="font-size:16px;padding:6px 16px;" onclick="cmpSetZoom(cmpFsZoom-0.5)">&#8722;</button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px;" onclick="cmpSetZoom(1)">Ajuster</button>
+      <button class="btn btn-ghost" style="font-size:16px;padding:6px 16px;" onclick="cmpSetZoom(cmpFsZoom+0.5)">+</button>
     </div>
   </div>
 </div>
@@ -1880,33 +1889,124 @@ function renderCmpChart(selected){
   cmpChartInstance=new Chart(ctx,buildCmpChartConfig(selected));
 }
 
-// ── Plein écran + export ───────────────────────────────────────────
+// ── Plein écran (image zoomable) + export ──────────────────────────
+let cmpFsCanvas=null; // canvas généré, réutilisé pour l'export
+let cmpFsCurrentTab="chart";
+
 function openCmpFullscreen(tab){
+  cmpFsCurrentTab=tab;
   const selected=getSelectedScenarios();
   document.getElementById("cmpFsTitle").textContent=tab==="chart"?"Écart vs SP500 — comparaison":"Tableau comparatif";
-  const chartWrap=document.getElementById("cmpFsChartWrap");
-  const tableWrap=document.getElementById("cmpFsTableWrap");
+  document.getElementById("cmpFsOverlay").classList.add("show");
+  const img=document.getElementById("cmpFsImg");
+  const loading=document.getElementById("cmpFsLoading");
+  img.style.display="none";loading.style.display="block";loading.textContent="Génération de l'image…";
+  cmpFsCanvas=null;
+
   if(tab==="chart"){
-    chartWrap.style.display="block";tableWrap.style.display="none";
-    document.getElementById("cmpFsOverlay").classList.add("show");
+    // Rendre le graphique sur un canvas caché, puis le convertir en image
+    if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
+    const cv=document.getElementById("cmpFsChart");
+    cv.style.display="block";cv.width=1000;cv.height=560;
+    const ctx=cv.getContext("2d");
+    const cfg=buildCmpChartConfig(selected);
+    cfg.options.animation=false;cfg.options.responsive=false;cfg.options.maintainAspectRatio=false;
+    cmpFsChartInstance=new Chart(ctx,cfg);
     setTimeout(()=>{
-      if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
-      const ctx=document.getElementById("cmpFsChart").getContext("2d");
-      cmpFsChartInstance=new Chart(ctx,buildCmpChartConfig(selected));
-    },60);
+      const tmp=document.createElement("canvas");
+      tmp.width=cv.width;tmp.height=cv.height;
+      const tctx=tmp.getContext("2d");
+      tctx.fillStyle="#0a0f1c";tctx.fillRect(0,0,tmp.width,tmp.height);
+      tctx.drawImage(cv,0,0);
+      cmpFsCanvas=tmp;
+      img.src=tmp.toDataURL("image/png");
+      cv.style.display="none";
+      img.style.display="block";loading.style.display="none";
+    },250);
   }else{
-    chartWrap.style.display="none";tableWrap.style.display="block";
-    tableWrap.innerHTML=buildCmpTableHTML(selected);
-    document.getElementById("cmpFsOverlay").classList.add("show");
+    // Rendre le tableau en image via html2canvas
+    if(typeof html2canvas==="undefined"){loading.textContent="Librairie non chargée, réessaie.";return;}
+    const holder=document.createElement("div");
+    holder.style.cssText="position:fixed;left:0;top:0;z-index:-1;padding:20px;background:#0a0f1c;";
+    holder.innerHTML=buildCmpTableExport(selected);
+    document.body.appendChild(holder);
+    html2canvas(holder,{backgroundColor:"#0a0f1c",scale:2,logging:false}).then(canvas=>{
+      holder.remove();
+      cmpFsCanvas=canvas;
+      img.src=canvas.toDataURL("image/png");
+      img.style.display="block";loading.style.display="none";
+    }).catch(err=>{holder.remove();loading.textContent="Erreur : "+err.message;});
   }
-  cmpFsCurrentTab=tab;
 }
-let cmpFsCurrentTab="chart";
 
 function closeCmpFullscreen(){
   document.getElementById("cmpFsOverlay").classList.remove("show");
   if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
+  cmpFsCanvas=null;
+  cmpFsZoom=1;cmpFsPanX=0;cmpFsPanY=0;applyCmpZoom();
 }
+
+// Zoom par double-tap / pincement / boutons sur l'image plein écran
+let cmpFsZoom=1, cmpFsPanX=0, cmpFsPanY=0;
+function applyCmpZoom(){
+  const img=document.getElementById("cmpFsImg");
+  if(img){
+    img.style.transformOrigin="0 0";
+    img.style.transform="translate("+cmpFsPanX+"px,"+cmpFsPanY+"px) scale("+cmpFsZoom+")";
+    img.style.width="100%";
+  }
+}
+function cmpZoomToggle(){
+  if(cmpFsZoom>1){cmpFsZoom=1;cmpFsPanX=0;cmpFsPanY=0;}else{cmpFsZoom=2.2;}
+  applyCmpZoom();
+}
+function cmpSetZoom(z){
+  cmpFsZoom=Math.max(1,Math.min(6,z));
+  if(cmpFsZoom===1){cmpFsPanX=0;cmpFsPanY=0;}
+  applyCmpZoom();
+}
+
+// Gestes tactiles : pincement à 2 doigts + déplacement à 1 doigt quand zoomé
+(function setupCmpGestures(){
+  function init(){
+    const body=document.getElementById("cmpFsBody");
+    if(!body)return;
+    let startDist=0,startZoom=1,startPanX=0,startPanY=0,startX=0,startY=0,mode=null,startMidX=0,startMidY=0;
+    function dist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+    function mid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+    body.addEventListener("touchstart",e=>{
+      if(e.touches.length===2){
+        mode="pinch";startDist=dist(e.touches);startZoom=cmpFsZoom;
+        const m=mid(e.touches);startMidX=m.x;startMidY=m.y;
+        startPanX=cmpFsPanX;startPanY=cmpFsPanY;
+        e.preventDefault();
+      }else if(e.touches.length===1&&cmpFsZoom>1){
+        mode="pan";startX=e.touches[0].clientX;startY=e.touches[0].clientY;
+        startPanX=cmpFsPanX;startPanY=cmpFsPanY;
+      }
+    },{passive:false});
+    body.addEventListener("touchmove",e=>{
+      if(mode==="pinch"&&e.touches.length===2){
+        const d=dist(e.touches);
+        cmpFsZoom=Math.max(1,Math.min(6,startZoom*(d/startDist)));
+        const m=mid(e.touches);
+        cmpFsPanX=startPanX+(m.x-startMidX);
+        cmpFsPanY=startPanY+(m.y-startMidY);
+        if(cmpFsZoom<=1){cmpFsPanX=0;cmpFsPanY=0;}
+        applyCmpZoom();
+        e.preventDefault();
+      }else if(mode==="pan"&&e.touches.length===1&&cmpFsZoom>1){
+        cmpFsPanX=startPanX+(e.touches[0].clientX-startX);
+        cmpFsPanY=startPanY+(e.touches[0].clientY-startY);
+        applyCmpZoom();
+        e.preventDefault();
+      }
+    },{passive:false});
+    body.addEventListener("touchend",e=>{if(e.touches.length===0)mode=null;});
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
+  else init();
+})();
 
 // Livraison d'un blob : partage natif iOS si dispo, sinon nouvel onglet, sinon download
 async function deliverBlob(blob,filename,mime){
@@ -1940,47 +2040,17 @@ function canvasToBlob(canvas,mime){
 
 function exportCmp(format){
   const name="comparimo-"+cmpFsCurrentTab+"-"+new Date().toISOString().slice(0,10);
-
-  // ── GRAPHIQUE ──
-  if(cmpFsCurrentTab==="chart"){
-    if(!cmpFsChartInstance){alert("Graphique non prêt");return;}
-    const src=document.getElementById("cmpFsChart");
-    const tmp=document.createElement("canvas");
-    tmp.width=src.width;tmp.height=src.height;
-    const tctx=tmp.getContext("2d");
-    tctx.fillStyle="#0a0f1c";tctx.fillRect(0,0,tmp.width,tmp.height);
-    tctx.drawImage(src,0,0);
-    if(format==="png"){
-      canvasToBlob(tmp,"image/png").then(b=>deliverBlob(b,name+".png","image/png"));
-    }else{
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({orientation:"landscape",unit:"px",format:[tmp.width,tmp.height]});
-      pdf.addImage(tmp.toDataURL("image/png"),"PNG",0,0,tmp.width,tmp.height);
-      deliverBlob(pdf.output("blob"),name+".pdf","application/pdf");
-    }
-    return;
+  if(!cmpFsCanvas){alert("Image pas encore prête, patiente une seconde.");return;}
+  if(format==="png"){
+    canvasToBlob(cmpFsCanvas,"image/png").then(b=>deliverBlob(b,name+".png","image/png"));
+  }else{
+    const {jsPDF}=window.jspdf;
+    const w=cmpFsCanvas.width,h=cmpFsCanvas.height;
+    const orient=w>h?"landscape":"portrait";
+    const pdf=new jsPDF({orientation:orient,unit:"px",format:[w,h]});
+    pdf.addImage(cmpFsCanvas.toDataURL("image/png"),"PNG",0,0,w,h);
+    deliverBlob(pdf.output("blob"),name+".pdf","application/pdf");
   }
-
-  // ── TABLEAU ──
-  if(typeof html2canvas==="undefined"){alert("Librairie d'export non chargée, réessaie dans un instant.");return;}
-  const selected=getSelectedScenarios();
-  const holder=document.createElement("div");
-  holder.style.cssText="position:fixed;left:0;top:0;z-index:-1;padding:24px;background:#0a0f1c;";
-  holder.innerHTML="<div style='color:#e8eef8;font-family:sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;'>Comparaison des scénarios — Comparimo</div>"+buildCmpTableExport(selected);
-  document.body.appendChild(holder);
-
-  html2canvas(holder,{backgroundColor:"#0a0f1c",scale:2,logging:false}).then(canvas=>{
-    holder.remove();
-    if(format==="png"){
-      canvasToBlob(canvas,"image/png").then(b=>deliverBlob(b,name+".png","image/png"));
-    }else{
-      const {jsPDF}=window.jspdf;
-      const orient=canvas.width>canvas.height?"landscape":"portrait";
-      const pdf=new jsPDF({orientation:orient,unit:"px",format:[canvas.width,canvas.height]});
-      pdf.addImage(canvas.toDataURL("image/png"),"PNG",0,0,canvas.width,canvas.height);
-      deliverBlob(pdf.output("blob"),name+".pdf","application/pdf");
-    }
-  }).catch(err=>{holder.remove();alert("Erreur export : "+err.message);});
 }
 
 // Version du tableau avec couleurs en dur pour html2canvas (pas de var CSS)
