@@ -13,6 +13,8 @@
 <title>Comparimo</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg:#070d19;--card:#0d1526;--card2:#131f33;--border:#1a2540;--borderL:#243050;
@@ -390,13 +392,34 @@ textarea.prompt-input{resize:none;height:80px;line-height:1.5;}
     <div class="chart-card" style="margin-top:8px;">
       <div class="chart-head">
         <div><div class="ct">&#201;cart vs SP500 — comparaison</div><div class="cs">Gain suppl&#233;mentaire vs bourse, si vente &#224; l'ann&#233;e t</div></div>
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="openCmpFullscreen('chart')">&#9974; Agrandir</button>
       </div>
       <div class="chart-canvas-wrap"><canvas id="cmpChart"></canvas></div>
     </div>
   </div>
 
-  <div id="cmp-table-view" style="display:none;overflow-x:auto;margin-top:8px;">
-    <div id="cmpTable"></div>
+  <div id="cmp-table-view" style="display:none;margin-top:8px;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="openCmpFullscreen('table')">&#9974; Agrandir</button>
+    </div>
+    <div style="overflow-x:auto;"><div id="cmpTable"></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="cmpFsOverlay" onclick="if(event.target===this)closeCmpFullscreen()">
+  <div style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;padding:16px;padding-top:calc(16px + env(safe-area-inset-top));">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
+      <h3 id="cmpFsTitle" style="font-size:16px;margin:0;">Comparaison</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-ghost" style="font-size:12px;padding:7px 12px;" onclick="exportCmp('png')">&#128247; PNG</button>
+        <button class="btn btn-ghost" style="font-size:12px;padding:7px 12px;" onclick="exportCmp('pdf')">&#128196; PDF</button>
+        <button class="btn btn-ghost" style="font-size:16px;padding:5px 12px;" onclick="closeCmpFullscreen()">&#215;</button>
+      </div>
+    </div>
+    <div id="cmpFsBody" style="flex:1;overflow:auto;background:var(--card);border-radius:14px;padding:16px;">
+      <div id="cmpFsChartWrap" style="display:none;height:100%;min-height:400px;"><canvas id="cmpFsChart"></canvas></div>
+      <div id="cmpFsTableWrap" style="display:none;overflow:auto;"></div>
+    </div>
   </div>
 </div>
 
@@ -1819,10 +1842,9 @@ function renderCompare(){
   else renderCmpTable(selected);
 }
 
-function renderCmpChart(selected){
-  if(typeof Chart==="undefined")return;
-  if(cmpChartInstance){cmpChartInstance.destroy();cmpChartInstance=null;}
-  const ctx=document.getElementById("cmpChart").getContext("2d");
+let cmpFsChartInstance=null;
+
+function buildCmpChartConfig(selected){
   const maxDuree=selected.length?Math.max(...selected.map(s=>s.data.duree||25)):25;
   const labels=Array.from({length:maxDuree+1},(_,i)=>i);
   const datasets=selected.length?selected.map((s,i)=>{
@@ -1831,11 +1853,9 @@ function renderCmpChart(selected){
       borderColor:CMP_COLORS[i%CMP_COLORS.length],backgroundColor:"transparent",
       borderWidth:2.5,tension:0.35,pointRadius:0,pointHoverRadius:5};
   }):[{label:"Sélectionne des scénarios ci-dessus",data:[],borderColor:"#334155",borderWidth:1}];
-  // Zero line dataset
   const zeroLine={label:"",data:Array(maxDuree+1).fill(0),borderColor:"rgba(255,255,255,0.12)",borderWidth:1,borderDash:[4,4],pointRadius:0,tension:0};
-  const allDatasets=datasets.concat([zeroLine]);
-  cmpChartInstance=new Chart(ctx,{type:"line",
-    data:{labels:labels,datasets:allDatasets},
+  return{type:"line",
+    data:{labels:labels,datasets:datasets.concat([zeroLine])},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
       interaction:{mode:"index",intersect:false},
       plugins:{
@@ -1850,12 +1870,72 @@ function renderCmpChart(selected){
         y:{grid:{color:"#0f1a2e",drawTicks:false},ticks:{color:"#5b7299",font:{size:10},callback:v=>frK(v)},border:{display:false}}
       }
     }
-  });
+  };
+}
+
+function renderCmpChart(selected){
+  if(typeof Chart==="undefined")return;
+  if(cmpChartInstance){cmpChartInstance.destroy();cmpChartInstance=null;}
+  const ctx=document.getElementById("cmpChart").getContext("2d");
+  cmpChartInstance=new Chart(ctx,buildCmpChartConfig(selected));
+}
+
+// ── Plein écran + export ───────────────────────────────────────────
+function openCmpFullscreen(tab){
+  const selected=getSelectedScenarios();
+  document.getElementById("cmpFsTitle").textContent=tab==="chart"?"Écart vs SP500 — comparaison":"Tableau comparatif";
+  const chartWrap=document.getElementById("cmpFsChartWrap");
+  const tableWrap=document.getElementById("cmpFsTableWrap");
+  if(tab==="chart"){
+    chartWrap.style.display="block";tableWrap.style.display="none";
+    document.getElementById("cmpFsOverlay").classList.add("show");
+    setTimeout(()=>{
+      if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
+      const ctx=document.getElementById("cmpFsChart").getContext("2d");
+      cmpFsChartInstance=new Chart(ctx,buildCmpChartConfig(selected));
+    },60);
+  }else{
+    chartWrap.style.display="none";tableWrap.style.display="block";
+    tableWrap.innerHTML=buildCmpTableHTML(selected);
+    document.getElementById("cmpFsOverlay").classList.add("show");
+  }
+  cmpFsCurrentTab=tab;
+}
+let cmpFsCurrentTab="chart";
+
+function closeCmpFullscreen(){
+  document.getElementById("cmpFsOverlay").classList.remove("show");
+  if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
+}
+
+function exportCmp(format){
+  const body=document.getElementById("cmpFsBody");
+  const target=cmpFsCurrentTab==="chart"?document.getElementById("cmpFsChartWrap"):document.getElementById("cmpFsTableWrap");
+  if(typeof html2canvas==="undefined"){alert("Export indisponible");return;}
+  html2canvas(target,{backgroundColor:"#0a0f1c",scale:2,logging:false}).then(canvas=>{
+    const name="comparimo-"+cmpFsCurrentTab+"-"+new Date().toISOString().slice(0,10);
+    if(format==="png"){
+      const a=document.createElement("a");
+      a.href=canvas.toDataURL("image/png");a.download=name+".png";a.click();
+    }else{
+      const {jsPDF}=window.jspdf;
+      const img=canvas.toDataURL("image/png");
+      const w=canvas.width,h=canvas.height;
+      const orient=w>h?"l":"p";
+      const pdf=new jsPDF({orientation:orient,unit:"px",format:[w,h]});
+      pdf.addImage(img,"PNG",0,0,w,h);
+      pdf.save(name+".pdf");
+    }
+  }).catch(()=>alert("Erreur lors de l'export"));
 }
 
 function renderCmpTable(selected){
   const el=document.getElementById("cmpTable");
-  if(!selected.length){el.innerHTML="<div style='color:var(--muted);font-size:13px;padding:20px 0;text-align:center;'>Sélectionne au moins un scénario.</div>";return;}
+  el.innerHTML=buildCmpTableHTML(selected);
+}
+
+function buildCmpTableHTML(selected){
+  if(!selected.length){return "<div style='color:var(--muted);font-size:13px;padding:20px 0;text-align:center;'>Sélectionne au moins un scénario.</div>";}
   const cs=selected.map(function(s){return Object.assign({},s,{c:compute(s.data)});});
   const maxDuree=Math.max(...cs.map(s=>s.data.duree||25));
   const rows=[
@@ -1868,6 +1948,7 @@ function renderCmpTable(selected){
     {l:"Rendement brut",f:s=>s.c.rendBrut.toFixed(2)+" %",n:s=>s.c.rendBrut,low:false},
     {l:"Break-even vente",f:s=>s.c.beNet?"An "+s.c.beNet:"Jamais",n:s=>s.c.beNet||999,low:true},
     {l:"Bat SP500",f:s=>s.c.beSP?"An "+s.c.beSP:"Jamais",n:s=>s.c.beSP||999,low:true},
+    {l:"Année vente opti",f:s=>s.c.anneeVenteOpt?"An "+s.c.anneeVenteOpt:"Jamais",n:s=>s.c.anneeVenteOpt||999,low:true},
     {l:"Net poche An 10",f:s=>{const d=s.c.data[Math.min(10,s.data.duree)];return d?eur(d.netApresImpot):"—";},n:s=>{const d=s.c.data[Math.min(10,s.data.duree)];return d?d.netApresImpot:-9e9;},low:false},
     {l:"Net poche An 20",f:s=>{const d=s.c.data[Math.min(20,s.data.duree)];return d?eur(d.netApresImpot):"—";},n:s=>{const d=s.c.data[Math.min(20,s.data.duree)];return d?d.netApresImpot:-9e9;},low:false},
     {l:"Net poche An "+maxDuree,f:s=>{const d=s.c.data[s.data.duree];return d?eur(d.netApresImpot):"—";},n:s=>{const d=s.c.data[s.data.duree];return d?d.netApresImpot:-9e9;},low:false},
@@ -1886,7 +1967,6 @@ function renderCmpTable(selected){
       const v=row.n(s);
       const isBest=v===best&&cs.length>1;
       const isWorst=v===worst&&cs.length>1&&best!==worst;
-      // Special coloring for SP500 écart rows: green if positive, red if negative
       const isEcart=row.l.startsWith("Écart vs SP500");
       let cls=isBest?"cmp-best":isWorst?"cmp-worst":"";
       let style="";
@@ -1895,7 +1975,7 @@ function renderCmpTable(selected){
     }).join("");
     return"<tr><td>"+row.l+"</td>"+cells+"</tr>";
   }).join("");
-  el.innerHTML="<table class='cmp-table'>"+hdr+bdy+"</table>";
+  return"<table class='cmp-table'>"+hdr+bdy+"</table>";
 }
 
 render();
