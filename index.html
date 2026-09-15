@@ -1908,25 +1908,109 @@ function closeCmpFullscreen(){
   if(cmpFsChartInstance){cmpFsChartInstance.destroy();cmpFsChartInstance=null;}
 }
 
+// Livraison d'un blob : partage natif iOS si dispo, sinon nouvel onglet, sinon download
+async function deliverBlob(blob,filename,mime){
+  const file=new File([blob],filename,{type:mime});
+  // 1. Partage natif (iOS PWA : "Enregistrer l'image", "Partager"...)
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:filename});return;}catch(e){if(e.name==="AbortError")return;}
+  }
+  // 2. Ouvrir dans un nouvel onglet (l'utilisateur fait appui long → Enregistrer)
+  const url=URL.createObjectURL(blob);
+  const win=window.open(url,"_blank");
+  if(!win){
+    // 3. Dernier recours : lien download
+    const a=document.createElement("a");a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();
+  }
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
+function canvasToBlob(canvas,mime){
+  return new Promise(res=>{
+    if(canvas.toBlob){canvas.toBlob(b=>res(b),mime);}
+    else{ // fallback
+      const data=atob(canvas.toDataURL(mime).split(",")[1]);
+      const arr=new Uint8Array(data.length);
+      for(let i=0;i<data.length;i++)arr[i]=data.charCodeAt(i);
+      res(new Blob([arr],{type:mime}));
+    }
+  });
+}
+
 function exportCmp(format){
-  const body=document.getElementById("cmpFsBody");
-  const target=cmpFsCurrentTab==="chart"?document.getElementById("cmpFsChartWrap"):document.getElementById("cmpFsTableWrap");
-  if(typeof html2canvas==="undefined"){alert("Export indisponible");return;}
-  html2canvas(target,{backgroundColor:"#0a0f1c",scale:2,logging:false}).then(canvas=>{
-    const name="comparimo-"+cmpFsCurrentTab+"-"+new Date().toISOString().slice(0,10);
+  const name="comparimo-"+cmpFsCurrentTab+"-"+new Date().toISOString().slice(0,10);
+
+  // ── GRAPHIQUE ──
+  if(cmpFsCurrentTab==="chart"){
+    if(!cmpFsChartInstance){alert("Graphique non prêt");return;}
+    const src=document.getElementById("cmpFsChart");
+    const tmp=document.createElement("canvas");
+    tmp.width=src.width;tmp.height=src.height;
+    const tctx=tmp.getContext("2d");
+    tctx.fillStyle="#0a0f1c";tctx.fillRect(0,0,tmp.width,tmp.height);
+    tctx.drawImage(src,0,0);
     if(format==="png"){
-      const a=document.createElement("a");
-      a.href=canvas.toDataURL("image/png");a.download=name+".png";a.click();
+      canvasToBlob(tmp,"image/png").then(b=>deliverBlob(b,name+".png","image/png"));
     }else{
       const {jsPDF}=window.jspdf;
-      const img=canvas.toDataURL("image/png");
-      const w=canvas.width,h=canvas.height;
-      const orient=w>h?"l":"p";
-      const pdf=new jsPDF({orientation:orient,unit:"px",format:[w,h]});
-      pdf.addImage(img,"PNG",0,0,w,h);
-      pdf.save(name+".pdf");
+      const pdf=new jsPDF({orientation:"landscape",unit:"px",format:[tmp.width,tmp.height]});
+      pdf.addImage(tmp.toDataURL("image/png"),"PNG",0,0,tmp.width,tmp.height);
+      deliverBlob(pdf.output("blob"),name+".pdf","application/pdf");
     }
-  }).catch(()=>alert("Erreur lors de l'export"));
+    return;
+  }
+
+  // ── TABLEAU ──
+  if(typeof html2canvas==="undefined"){alert("Librairie d'export non chargée, réessaie dans un instant.");return;}
+  const selected=getSelectedScenarios();
+  const holder=document.createElement("div");
+  holder.style.cssText="position:fixed;left:0;top:0;z-index:-1;padding:24px;background:#0a0f1c;";
+  holder.innerHTML="<div style='color:#e8eef8;font-family:sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;'>Comparaison des scénarios — Comparimo</div>"+buildCmpTableExport(selected);
+  document.body.appendChild(holder);
+
+  html2canvas(holder,{backgroundColor:"#0a0f1c",scale:2,logging:false}).then(canvas=>{
+    holder.remove();
+    if(format==="png"){
+      canvasToBlob(canvas,"image/png").then(b=>deliverBlob(b,name+".png","image/png"));
+    }else{
+      const {jsPDF}=window.jspdf;
+      const orient=canvas.width>canvas.height?"landscape":"portrait";
+      const pdf=new jsPDF({orientation:orient,unit:"px",format:[canvas.width,canvas.height]});
+      pdf.addImage(canvas.toDataURL("image/png"),"PNG",0,0,canvas.width,canvas.height);
+      deliverBlob(pdf.output("blob"),name+".pdf","application/pdf");
+    }
+  }).catch(err=>{holder.remove();alert("Erreur export : "+err.message);});
+}
+
+// Version du tableau avec couleurs en dur pour html2canvas (pas de var CSS)
+function buildCmpTableExport(selected){
+  if(!selected.length)return"<div style='color:#8aa0c0;'>Aucun scénario sélectionné.</div>";
+  const cs=selected.map(s=>Object.assign({},s,{c:compute(s.data)}));
+  const maxDuree=Math.max(...cs.map(s=>s.data.duree||25));
+  const COLORS=["#38bdf8","#34d399","#f59e0b","#a78bfa","#f87171","#22d3ee"];
+  const rows=[
+    {l:"Prix d'achat",f:s=>fr(s.data.prixAchat)+" €"},
+    {l:"Loyer / mois",f:s=>fr(s.data.loyer)+" €"},
+    {l:"Taux crédit",f:s=>s.data.taux+" %"},
+    {l:"Mensualité",f:s=>fr(s.c.mensualite)+" €"},
+    {l:"Cash-flow brut",f:s=>eur(s.c.cashflow)},
+    {l:"CF après impôt",f:s=>eur(s.c.cfApresImpot)},
+    {l:"Rendement brut",f:s=>s.c.rendBrut.toFixed(2)+" %"},
+    {l:"Break-even vente",f:s=>s.c.beNet?"An "+s.c.beNet:"Jamais"},
+    {l:"Bat SP500",f:s=>s.c.beSP?"An "+s.c.beSP:"Jamais"},
+    {l:"Année vente opti",f:s=>s.c.anneeVenteOpt?"An "+s.c.anneeVenteOpt:"Jamais"},
+    {l:"Net poche An 10",f:s=>{const d=s.c.data[Math.min(10,s.data.duree)];return d?eur(d.netApresImpot):"—";}},
+    {l:"Net poche An 20",f:s=>{const d=s.c.data[Math.min(20,s.data.duree)];return d?eur(d.netApresImpot):"—";}},
+    {l:"Net poche An "+maxDuree,f:s=>{const d=s.c.data[s.data.duree];return d?eur(d.netApresImpot):"—";}},
+    {l:"Écart vs SP500 An 10",f:s=>{const d=s.c.data[Math.min(10,s.data.duree)];if(!d)return"—";const v=d.netApresImpot-d.sp;return(v>=0?"+":"")+fr(v)+" €";}},
+    {l:"Écart vs SP500 An 20",f:s=>{const d=s.c.data[Math.min(20,s.data.duree)];if(!d)return"—";const v=d.netApresImpot-d.sp;return(v>=0?"+":"")+fr(v)+" €";}},
+    {l:"Écart vs SP500 An "+maxDuree,f:s=>{const d=s.c.data[s.data.duree];if(!d)return"—";const v=d.netApresImpot-d.sp;return(v>=0?"+":"")+fr(v)+" €";}},
+  ];
+  const th="border:1px solid #1e2d47;padding:8px 12px;font-size:12px;white-space:nowrap;";
+  const hdr="<tr><th style='"+th+"background:#111c2f;color:#8aa0c0;text-align:left;'>Indicateur</th>"+cs.map((s,i)=>"<th style='"+th+"background:#111c2f;color:"+COLORS[i%COLORS.length]+";'>"+escapeHtml(s.propName)+"<br><span style='font-weight:400;font-size:10px;'>"+escapeHtml(s.scenLabel)+"</span></th>").join("")+"</tr>";
+  const bdy=rows.map(row=>"<tr><td style='"+th+"background:#111c2f;color:#c8d4e6;text-align:left;'>"+row.l+"</td>"+cs.map(s=>"<td style='"+th+"background:#0d1524;color:#e8eef8;text-align:center;'>"+row.f(s)+"</td>").join("")+"</tr>").join("");
+  return"<table style='border-collapse:collapse;'>"+hdr+bdy+"</table>";
 }
 
 function renderCmpTable(selected){
